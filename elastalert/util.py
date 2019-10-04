@@ -475,7 +475,6 @@ def get_account(account_file, anchor_file):
     It can be either an absolute file path or one that is relative to the given rule.
     :param anchor_file: Path to the file which will be the reference directory for any relative pathnames.
     """
-    return util.get_account(account_file, self.rule['rule_file'])
     if os.path.isabs(account_file):
         account_file_path = account_file
     else:
