@@ -183,6 +183,19 @@ is "ElastAlert".
 ``smtp_host``: The SMTP host used to send email notifications. This value will be used for email alerts as well,
 unless overwritten in the rule config. The default is "localhost".
 
+``smtp_port``: The port to use. Default is 25.
+
+``smtp_ssl``: Connect the SMTP host using TLS, defaults to ``false``. If ``smtp_ssl`` is not used, ElastAlert will still attempt
+STARTTLS.
+
+``smtp_auth_file``: The path to a file which contains SMTP authentication credentials. The path can be either absolute or relative. 
+It should be YAML formatted and contain two fields, ``user`` and ``password``. If this is not present,
+no authentication will be attempted.
+
+``smtp_cert_file``: Connect the SMTP host using the given path to a TLS certificate file, default to ``None``.
+
+``smtp_key_file``: Connect the SMTP host using the given path to a TLS key file, default to ``None``.
+
 ``email_reply_to``: This sets the Reply-To header in emails. The default is the recipient address.
 
 ``aws_region``: This makes ElastAlert to sign HTTP requests when using Amazon Elasticsearch Service. It'll use instance role keys to sign the requests.

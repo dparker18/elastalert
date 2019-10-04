@@ -13,10 +13,6 @@ import warnings
 from email.mime.text import MIMEText
 from email.utils import formatdate
 from html.parser import HTMLParser
-from smtplib import SMTP
-from smtplib import SMTP_SSL
-from smtplib import SMTPAuthenticationError
-from smtplib import SMTPException
 from socket import error
 
 import boto3
@@ -38,6 +34,7 @@ from twilio.rest import Client as TwilioClient
 
 from .util import EAException
 from .util import elastalert_logger
+from .util import get_account
 from .util import lookup_es_key
 from .util import pretty_ts
 from .util import resolve_string
@@ -301,21 +298,6 @@ class Alerter(object):
     def create_default_title(self, matches):
         return self.rule['name']
 
-    def get_account(self, account_file):
-        """ Gets the username and password from an account file.
-
-        :param account_file: Path to the file which contains user and password information.
-        It can be either an absolute file path or one that is relative to the given rule.
-        """
-        if os.path.isabs(account_file):
-            account_file_path = account_file
-        else:
-            account_file_path = os.path.join(os.path.dirname(self.rule['rule_file']), account_file)
-        account_conf = yaml_loader(account_file_path)
-        if 'user' not in account_conf or 'password' not in account_conf:
-            raise EAException('Account file must have user and password fields')
-        self.user = account_conf['user']
-        self.password = account_conf['password']
 
 
 class StompAlerter(Alerter):
@@ -415,7 +397,7 @@ class EmailAlerter(Alerter):
         self.from_addr = self.rule.get('from_addr', 'ElastAlert')
         self.smtp_port = self.rule.get('smtp_port')
         if self.rule.get('smtp_auth_file'):
-            self.get_account(self.rule['smtp_auth_file'])
+            self.smtp_user, self.smtp_password = get_account(self.rule['smtp_auth_file'], self.rule['rule_file'])
         self.smtp_key_file = self.rule.get('smtp_key_file')
         self.smtp_cert_file = self.rule.get('smtp_cert_file')
         # Convert email to a list if it isn't already
@@ -469,25 +451,9 @@ class EmailAlerter(Alerter):
             to_addr = to_addr + self.rule['bcc']
 
         try:
-            if self.smtp_ssl:
-                if self.smtp_port:
-                    self.smtp = SMTP_SSL(self.smtp_host, self.smtp_port, keyfile=self.smtp_key_file, certfile=self.smtp_cert_file)
-                else:
-                    self.smtp = SMTP_SSL(self.smtp_host, keyfile=self.smtp_key_file, certfile=self.smtp_cert_file)
-            else:
-                if self.smtp_port:
-                    self.smtp = SMTP(self.smtp_host, self.smtp_port)
-                else:
-                    self.smtp = SMTP(self.smtp_host)
-                self.smtp.ehlo()
-                if self.smtp.has_extn('STARTTLS'):
-                    self.smtp.starttls(keyfile=self.smtp_key_file, certfile=self.smtp_cert_file)
-            if 'smtp_auth_file' in self.rule:
-                self.smtp.login(self.user, self.password)
-        except (SMTPException, error) as e:
-            raise EAException("Error connecting to SMTP host: %s" % (e))
-        except SMTPAuthenticationError as e:
-            raise EAException("SMTP username/password rejected: %s" % (e))
+            self.smtp = get_smtp_connection(self, self.rule)
+        except EAException as e:
+            raise e
         self.smtp.sendmail(self.from_addr, to_addr, email_msg.as_string())
         self.smtp.quit()
 
@@ -553,7 +519,7 @@ class JiraAlerter(Alerter):
     def __init__(self, rule):
         super(JiraAlerter, self).__init__(rule)
         self.server = self.rule['jira_server']
-        self.get_account(self.rule['jira_account_file'])
+        self.jira_user, self.jira_password = get_account(self.rule['jira_account_file'], self.rule['rule_file'])
         self.project = self.rule['jira_project']
         self.issue_type = self.rule['jira_issuetype']
 
@@ -595,7 +561,7 @@ class JiraAlerter(Alerter):
         self.reset_jira_args()
 
         try:
-            self.client = JIRA(self.server, basic_auth=(self.user, self.password))
+            self.client = JIRA(self.server, basic_auth=(self.jira_user, self.jira_password))
             self.get_priorities()
             self.jira_fields = self.client.fields()
             self.get_arbitrary_fields()

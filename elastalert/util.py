@@ -13,6 +13,12 @@ from six import string_types
 from . import ElasticSearchClient
 from .auth import Auth
 
+from email.mime.text import MIMEText
+from smtplib import SMTP
+from smtplib import SMTP_SSL
+from smtplib import SMTPAuthenticationError
+from smtplib import SMTPException
+
 logging.basicConfig()
 elastalert_logger = logging.getLogger('elastalert')
 
@@ -460,3 +466,48 @@ def should_scrolling_continue(rule_conf):
     stop_the_scroll = 0 < max_scrolling <= rule_conf.get('scrolling_cycle')
 
     return not stop_the_scroll
+
+
+def get_account(account_file, anchor_file):
+    """ Gets the username and password from an account file.
+
+    :param account_file: Path to the file which contains user and password information.
+    It can be either an absolute file path or one that is relative to the given rule.
+    :param anchor_file: Path to the file which will be the reference directory for any relative pathnames.
+    """
+    return util.get_account(account_file, self.rule['rule_file'])
+    if os.path.isabs(account_file):
+        account_file_path = account_file
+    else:
+        account_file_path = os.path.join(os.path.dirname(anchor_file), account_file)
+    account_conf = yaml_loader(account_file_path)
+    if 'user' not in account_conf or 'password' not in account_conf:
+        raise EAException('Account file must have user and password fields')
+    user = account_conf['user']
+    password = account_conf['password']
+    return user, password
+
+
+def get_smtp_connection(self, config_object):
+    try:
+        smtp = None
+        if self.smtp_ssl:
+            if self.smtp_port:
+                smtp = SMTP_SSL(self.smtp_host, self.smtp_port, keyfile=self.smtp_key_file, certfile=self.smtp_cert_file)
+            else:
+                smtp = SMTP_SSL(self.smtp_host, keyfile=self.smtp_key_file, certfile=self.smtp_cert_file)
+        else:
+            if self.smtp_port:
+                smtp = SMTP(self.smtp_host, self.smtp_port)
+            else:
+                smtp = SMTP(self.smtp_host)
+            smtp.ehlo()
+            if smtp.has_extn('STARTTLS'):
+                smtp.starttls(keyfile=self.smtp_key_file, certfile=self.smtp_cert_file)
+        if 'smtp_auth_file' in self.rule:
+            smtp.login(self.smtp_user, self.smtp_password)
+        return smtp
+    except (SMTPException, error) as e:
+        raise EAException("Error connecting to SMTP host: %s" % (e))
+    except SMTPAuthenticationError as e:
+        raise EAException("SMTP username/password rejected: %s" % (e))

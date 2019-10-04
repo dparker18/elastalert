@@ -12,10 +12,8 @@ import threading
 import time
 import timeit
 import traceback
-from email.mime.text import MIMEText
-from smtplib import SMTP
-from smtplib import SMTPException
 from socket import error
+from staticconf.loader import yaml_loader
 
 import dateutil.tz
 import pytz
@@ -38,6 +36,7 @@ from .util import EAException
 from .util import elastalert_logger
 from .util import elasticsearch_client
 from .util import format_index
+from .util import get_account
 from .util import lookup_es_key
 from .util import parse_deadline
 from .util import parse_duration
@@ -150,6 +149,12 @@ class ElastAlerter(object):
         self.notify_email = self.conf.get('notify_email', [])
         self.from_addr = self.conf.get('from_addr', 'ElastAlert')
         self.smtp_host = self.conf.get('smtp_host', 'localhost')
+        self.smtp_ssl = self.conf.get('smtp_ssl', False)
+        self.smtp_port = self.conf.get('smtp_port')
+        if self.conf.get('smtp_auth_file'):
+            self.smtp_user, self.smtp_password = get_account(self.conf['smtp_auth_file'], self.args.config)
+        self.smtp_key_file = self.conf.get('smtp_key_file')
+        self.smtp_cert_file = self.conf.get('smtp_cert_file')
         self.max_aggregation = self.conf.get('max_aggregation', 10000)
         self.buffer_time = self.conf['buffer_time']
         self.silence_cache = {}
@@ -1961,10 +1966,10 @@ class ElastAlerter(object):
         email['Reply-To'] = self.conf.get('email_reply_to', email['To'])
 
         try:
-            smtp = SMTP(self.smtp_host)
+            smtp = get_smtp_connection(self, self.conf)
             smtp.sendmail(self.from_addr, recipients, email.as_string())
-        except (SMTPException, error) as e:
-            self.handle_error('Error connecting to SMTP host: %s' % (e), {'email_body': email_body})
+        except EAException as e:
+            self.handle_error(e, {'email_body': email_body})
 
     def get_top_counts(self, rule, starttime, endtime, keys, number=None, qk=None):
         """ Counts the number of events for each unique value for each key field.

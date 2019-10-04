@@ -222,6 +222,11 @@ properties:
   email_reply_to: {type: string}
   notify_email: *arrayOfString # if rule is slow or erroring, send to this email
   smtp_host: {type: string}
+  smtp_port: {type: integer}
+  smtp_ssl: {type: boolean}
+  smtp_auth_file: {type: string}
+  smtp_cert_file: {type: string}
+  smtp_key_file: {type: string}
   from_addr: {type: string}
 
   ### JIRA
