@@ -13,7 +13,6 @@ import time
 import timeit
 import traceback
 from socket import error
-from staticconf.loader import yaml_loader
 
 import dateutil.tz
 import pytz

@@ -18,6 +18,7 @@ from smtplib import SMTP
 from smtplib import SMTP_SSL
 from smtplib import SMTPAuthenticationError
 from smtplib import SMTPException
+from staticconf.loader import yaml_loader
 
 logging.basicConfig()
 elastalert_logger = logging.getLogger('elastalert')
